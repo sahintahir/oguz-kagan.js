@@ -1,0 +1,263 @@
+const express = require('express');
+const path = require('path');
+const app = express();
+
+app.use(express.json());
+app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oğuz Kağan - Yapay Zeka</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 1200px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .api-section {
+            background: #f0f0f0;
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+        .api-section input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+        .api-section button {
+            padding: 12px 24px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .status {
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            background: #e9ecef;
+        }
+        .status.ready { background: #d4edda; color: #155724; }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .message.user { justify-content: flex-end; }
+        .message.bot { justify-content: flex-start; }
+        .message-content {
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+        }
+        .user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .bot .message-content {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .input-area button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .input-area button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🤖 Oğuz Kağan Yapay Zeka</h1>
+        <p>Bilge Kağan'ın torunu, yapay zekanın kralı</p>
+    </div>
+    <div class="api-section">
+        <input type="password" id="apiKeyInput" placeholder="OpenAI API Anahtarını Gir">
+        <button onclick="saveApiKey()">💾 Kaydet</button>
+    </div>
+    <div id="status" class="status waiting">⏳ API anahtarı girilmedi</div>
+    <div class="chat-area">
+        <div class="messages" id="messages">
+            <div class="message bot"><div class="message-content">Merhaba! Önce API anahtarını gir, sonra konuşalım. 🎯</div></div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Oğuz Kağan'a sor..." disabled>
+            <button id="sendBtn" onclick="sendMessage()" disabled>🚀 Gönder</button>
+        </div>
+    </div>
+</div>
+<script>
+    let currentApiKey = localStorage.getItem('oguz_api_key') || '';
+    if(currentApiKey) {
+        document.getElementById('status').innerHTML = '✅ API anahtarı hazır';
+        document.getElementById('status').className = 'status ready';
+        document.getElementById('messageInput').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+    }
+    function saveApiKey() {
+        const key = document.getElementById('apiKeyInput').value;
+        if(!key) { alert('Geçerli anahtar gir!'); return; }
+        currentApiKey = key;
+        localStorage.setItem('oguz_api_key', key);
+        document.getElementById('status').innerHTML = '✅ Anahtar kaydedildi';
+        document.getElementById('status').className = 'status ready';
+        document.getElementById('messageInput').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        document.getElementById('apiKeyInput').value = '••••••••••••';
+        addMessage('bot', '✅ Anahtar kaydedildi. Sorularını alabilirim.');
+    }
+    function addMessage(role, content) {
+        const messagesDiv = document.getElementById('messages');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + (role === 'user' ? 'user' : 'bot');
+        msgDiv.innerHTML = '<div class="message-content">' + content.replace(/</g, '&lt;') + '</div>';
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    async function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const msg = input.value.trim();
+        if(!msg) return;
+        if(!currentApiKey) { alert('Önce API anahtarını gir!'); return; }
+        addMessage('user', msg);
+        input.value = '';
+        const btn = document.getElementById('sendBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳...';
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey: currentApiKey, message: msg })
+            });
+            const data = await res.json();
+            if(data.error) addMessage('bot', '❌ ' + data.error);
+            else addMessage('bot', data.reply);
+        } catch(e) {
+            addMessage('bot', '❌ Bağlantı hatası: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🚀 Gönder';
+        }
+    }
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') sendMessage();
+    });
+</script>
+</body>
+</html>`);
+});
+
+// DOĞRU API ENDPOINT'İ (düzeltilmiş hata yok)
+app.post('/api/chat', async (req, res) => {
+    const { apiKey, message } = req.body;
+
+    if (!apiKey) {
+        return res.status(401).json({ error: 'API anahtarı gerekli' });
+    }
+
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    { role: 'system', content: 'Sen Oğuz Kağansın. Türk mitolojisindeki Oğuz Kağan karakterindesin. Bilge, cesur, adil ve destansı bir dille konuş. Kısa ve etkileyici cevaplar ver.' },
+                    { role: 'user', content: message }
+                ],
+                temperature: 0.8,
+                max_tokens: 500
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            return res.json({ error: data.error.message || 'API hatası!' });
+        }
+
+        const reply = data.choices[0].message.content;
+        res.json({ reply });
+
+    } catch (error) {
+        res.json({ error: 'Sunucu hatası: ' + error.message });
+    }
+});
+
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`
+    ╔═══════════════════════════════════════╗
+    ║   🚀 OĞUZ KAĞAN HAZIR                ║
+    ║   http://localhost:${PORT}             ║
+    ╚═══════════════════════════════════════╝
+    `);
+});
